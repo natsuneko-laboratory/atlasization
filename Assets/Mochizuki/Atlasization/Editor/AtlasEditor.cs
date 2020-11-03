@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.Serialization;
 using System.Text.RegularExpressions;
 
 using UnityEditor;
@@ -583,7 +584,6 @@ Material から検出されたテクスチャーの配置を確認します。
 
             Initialize,
 
-
             TextureMapping,
 
             Configuration,
@@ -593,12 +593,16 @@ Material から検出されたテクスチャーの配置を確認します。
 
         private enum AtlasSize
         {
+            [EnumMember(Value = "1K")]
             One,
 
+            [EnumMember(Value = "2K")]
             Two,
 
+            [EnumMember(Value = "4K")]
             Four,
 
+            [EnumMember(Value = "8K")]
             Eight
         }
 
@@ -606,8 +610,15 @@ Material から検出されたテクスチャーの配置を確認します。
 
         private static T EnumField<T>(string label, T value) where T : Enum
         {
+            string GetEnumMemberValue<T1>(string name)
+            {
+                var member = typeof(T1).GetMember(name);
+                var attr = member[0].GetCustomAttributes(false).OfType<EnumMemberAttribute>().First();
+                return attr?.Value;
+            }
+
             var items = Enum.GetNames(typeof(T))
-                            .Select(w => Regex.Replace(w, "(\\B[A-Z])", " $1"))
+                            .Select(w => GetEnumMemberValue<T>(w) ?? Regex.Replace(w, "(\\B[A-Z])", " $1"))
                             .Select(w => new GUIContent(w))
                             .ToArray();
 
