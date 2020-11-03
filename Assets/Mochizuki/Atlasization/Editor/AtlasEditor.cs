@@ -36,9 +36,6 @@ namespace Mochizuki.Atlasization
         private DefaultAsset _dest;
 
         [SerializeField]
-        private List<Renderer> _enabledRenderers;
-
-        [SerializeField]
         private List<Material> _materials;
 
         [SerializeField]
@@ -108,10 +105,6 @@ namespace Mochizuki.Atlasization
 
                 case WizardPages.Initialize:
                     isValidationSuccess = OnShowInitializePage();
-                    break;
-
-                case WizardPages.SelectRenderers:
-                    isValidationSuccess = OnShowSelectRenderersPage();
                     break;
 
                 case WizardPages.TextureMapping:
@@ -195,9 +188,12 @@ Unity 上でアトラス化作業を行えるエディター拡張です。
                 _obj = Instantiate(_original, _workspace.transform);
 
                 _renderers = new List<Renderer>();
-                _renderers.AddRange(_obj.GetComponentsInChildren<Renderer>(true).Where(w => w is SkinnedMeshRenderer || w is MeshRenderer));
+                _renderers.AddRange(_obj.GetComponentsInChildren<Renderer>(false).Where(w => w is SkinnedMeshRenderer || w is MeshRenderer));
 
-                _enabledRenderers = new List<Renderer>(_renderers);
+                _materials = _renderers.SelectMany(w => w.sharedMaterials).Distinct().ToList();
+                _textures = _materials.Where(w => w.HasProperty("_MainTex")).Select(w => w.mainTexture).Where(w => w is Texture2D).Cast<Texture2D>().Distinct().ToList();
+                _colors = _materials.Where(w => w.HasProperty("_Color") && w.mainTexture == null).Select(w => w.color).Distinct().ToList();
+                _shouldGenerateColorTextures = true;
             }
 
             if (_renderers?.Count != 0)
@@ -205,56 +201,6 @@ Unity 上でアトラス化作業を行えるエディター拡張です。
 
             ErrorField("Prefab もしくは GameObject に何らかの Renderer コンポーネントが含まれていません");
             return false;
-        }
-
-        private bool OnShowSelectRenderersPage()
-        {
-            using (new EditorGUILayout.VerticalScope(GUI.skin.box))
-            {
-                EditorGUILayout.LabelField(@"
-操作対象とする Renderer を削減したい場合は、必要なものを選択します。
-そうでない場合 (削減する必要が無い場合) は、設定を変更する必要はありません。
-".Trim());
-            }
-
-            EditorGUILayout.Space();
-            EditorGUILayout.LabelField("スキャン済み Renderer Components : ");
-            EditorGUI.indentLevel++;
-
-            var enabled = new HashSet<Renderer>();
-
-            foreach (var renderer in _renderers)
-            {
-                var rect = EditorGUILayout.GetControlRect();
-                var height = EditorGUIUtility.singleLineHeight;
-
-                var isEnabled = EditorGUI.Toggle(new Rect(rect.x, rect.y, height * 2, height), _enabledRenderers.Contains(renderer));
-                if (isEnabled)
-                    enabled.Add(renderer);
-
-                using (new EditorGUI.DisabledGroupScope(true))
-                    EditorGUI.ObjectField(new Rect(rect.x + height, rect.y, rect.width - height, height), renderer, renderer.GetType(), true);
-            }
-
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                if (GUILayout.Button("全て選択解除"))
-                    enabled.Clear();
-                if (GUILayout.Button("全て選択"))
-                    enabled.UnionWith(_renderers);
-            }
-
-            _enabledRenderers = enabled.ToList();
-
-            EditorGUI.indentLevel--;
-            EditorGUILayout.Space();
-
-            _materials = _enabledRenderers.SelectMany(w => w.sharedMaterials).Distinct().ToList();
-            _textures = _materials.Where(w => w.HasProperty("_MainTex")).Select(w => w.mainTexture).Where(w => w is Texture2D).Cast<Texture2D>().Distinct().ToList();
-            _colors = _materials.Where(w => w.HasProperty("_Color") && w.mainTexture == null).Select(w => w.color).Distinct().ToList();
-            _shouldGenerateColorTextures = true;
-
-            return _materials.Count > 0;
         }
 
         private bool OnShowTextureMappingPage()
@@ -347,7 +293,7 @@ Material から検出されたテクスチャーの配置を確認します。
                 ObjectPicker("対象の Prefab", _original);
 
                 EditorGUI.indentLevel++;
-                EditorGUILayout.LabelField($"対象の Renderer Count : {_enabledRenderers.Count}");
+                EditorGUILayout.LabelField($"対象の Renderer Count : {_renderers.Count}");
                 EditorGUILayout.LabelField($"対象の Material Count : {_materials.Count}");
                 EditorGUILayout.LabelField($"対象の Texture Count  : {_textures.Count}");
                 EditorGUI.indentLevel--;
@@ -412,7 +358,7 @@ Material から検出されたテクスチャーの配置を確認します。
 
             var baseDir = AssetDatabase.GetAssetPath(_dest);
             var atlas = CreateAtlasTexture(_textures, size, Path.Combine(baseDir, _name + ".png"));
-            CreateAtlasPrefab(_obj, _enabledRenderers, _textures, atlas, Path.Combine(baseDir, _name));
+            CreateAtlasPrefab(_obj, _renderers, _textures, atlas, Path.Combine(baseDir, _name));
         }
 
         private void Cleanup()
@@ -637,7 +583,6 @@ Material から検出されたテクスチャーの配置を確認します。
 
             Initialize,
 
-            SelectRenderers,
 
             TextureMapping,
 
