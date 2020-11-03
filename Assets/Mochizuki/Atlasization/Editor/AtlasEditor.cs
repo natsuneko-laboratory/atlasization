@@ -11,6 +11,10 @@ using System.Linq;
 using System.Runtime.Serialization;
 using System.Text.RegularExpressions;
 
+using Mochizuki.Atlasization.Internal.Attributes;
+using Mochizuki.Atlasization.Internal.Enum;
+using Mochizuki.Atlasization.Internal.Utils;
+
 using UnityEditor;
 
 using UnityEngine;
@@ -218,7 +222,7 @@ Material から検出されたテクスチャーの配置を確認します。
 
             if (_shouldGenerateColorTextures)
             {
-                _textures.AddRange(_colors.Select(CreateTexture2DFromColor));
+                _textures.AddRange(_colors.Select(Texture2DUtil.CreateTexture2DFromColor));
                 _shouldGenerateColorTextures = false;
             }
 
@@ -371,18 +375,6 @@ Material から検出されたテクスチャーの配置を確認します。
             _name = null;
         }
 
-        private static Texture2D CreateTexture2DFromColor(Color color)
-        {
-            var texture = new Texture2D(128, 128);
-            for (var i = 0; i < texture.height; i++)
-            for (var j = 0; j < texture.width; j++)
-                texture.SetPixel(i, j, color);
-
-            texture.Apply();
-
-            return texture;
-        }
-
         private static Texture2D CreateAtlasTexture(List<Texture2D> textures, int size, string dest)
         {
             var division = (int) Math.Ceiling(Math.Sqrt(textures.Count));
@@ -401,7 +393,7 @@ Material から検出されたテクスチャーの配置を確認します。
                         break;
 
                     var x = j * square;
-                    var texture = ResizeTexture(textures[k++], square);
+                    var texture = Texture2DUtil.ResizeTexture(textures[k++], square);
 
                     for (var m = 0; m < square; m++)
                     for (var n = 0; n < square; n++)
@@ -423,24 +415,6 @@ Material から検出されたテクスチャーの配置を確認します。
             importer.SaveAndReimport();
 
             return AssetDatabase.LoadAssetAtPath<Texture2D>(dest);
-        }
-
-        private static Texture2D ResizeTexture(Texture2D texture, int size)
-        {
-            // Graphics.ConvertTexture write pixels to GPU
-            var a = new Texture2D(size, size);
-            Graphics.ConvertTexture(texture, a);
-
-            // CPU (EncodeToPNG, GetPixel and others) could not read pixels directly from GPU
-            var r = RenderTexture.GetTemporary(size, size, 0);
-            RenderTexture.active = r;
-            Graphics.Blit(a, r);
-
-            var b = new Texture2D(size, size);
-            b.ReadPixels(new Rect(0, 0, size, size), 0, 0, false);
-            RenderTexture.ReleaseTemporary(r);
-
-            return b;
         }
 
         private static void CreateAtlasPrefab(GameObject gameObject, List<Renderer> renderers, List<Texture2D> textures, Texture2D atlas, string dest)
@@ -473,7 +447,8 @@ Material から検出されたテクスチャーの配置を確認します。
 
         private static void UpdateRendererUVs(SkinnedMeshRenderer renderer, int division, int square, List<Texture2D> textures, Material mat, ref int meshCounter, Dictionary<int, Mesh> meshCaches, string dest)
         {
-            var mesh = GetOrCreateMeshClone(renderer.sharedMesh, ref meshCounter, meshCaches, dest);
+            var originalMesh = renderer.sharedMesh;
+            var mesh = GetOrCreateMeshClone(originalMesh, ref meshCounter, meshCaches, dest);
             var uvs = mesh.uv;
             var materials = renderer.sharedMaterials;
 
@@ -482,13 +457,13 @@ Material から検出されたテクスチャーの配置を確認します。
 
             var alreadyCalculatedIds = new List<int>();
 
-            for (var i = 0; i < mesh.subMeshCount; i++)
+            for (var i = 0; i < originalMesh.subMeshCount; i++)
             {
                 var textureIndex = materials[i].HasProperty("_MainTex") ? textures.Select((w, j) => (Texture: w, Index: j)).FirstOrDefault(w => w.Texture == materials[i].mainTexture).Index : GetColorIndex(materials[i], textures);
                 var offsetX = textureIndex % division * square / (float) (division * square);
                 var offsetY = 1 - (textureIndex / division + 1) * square / (float) (square * division);
 
-                foreach (var triangle in mesh.GetTriangles(i))
+                foreach (var triangle in originalMesh.GetTriangles(i))
                 {
                     if (alreadyCalculatedIds.Contains(triangle))
                         continue;
@@ -507,12 +482,13 @@ Material から検出されたテクスチャーの配置を確認します。
             mesh.uv = uvs;
 
             renderer.sharedMesh = mesh;
-            renderer.sharedMaterials = Enumerable.Range(0, renderer.sharedMaterials.Length).Select(_ => mat).ToArray();
+            renderer.sharedMaterials = new List<Material> { mat }.ToArray();
         }
 
         private static void UpdateRendererUVs(MeshRenderer renderer, int division, int square, List<Texture2D> textures, Material mat, ref int meshCounter, Dictionary<int, Mesh> meshCaches, string dest)
         {
-            var mesh = GetOrCreateMeshClone(renderer.gameObject.GetComponent<MeshFilter>().sharedMesh, ref meshCounter, meshCaches, dest);
+            var originalMesh = renderer.gameObject.GetComponent<MeshFilter>().sharedMesh;
+            var mesh = GetOrCreateMeshClone(originalMesh, ref meshCounter, meshCaches, dest);
             var uvs = mesh.uv;
             var materials = renderer.sharedMaterials;
 
@@ -521,13 +497,13 @@ Material から検出されたテクスチャーの配置を確認します。
 
             var alreadyCalculatedIds = new List<int>();
 
-            for (var i = 0; i < mesh.subMeshCount; i++)
+            for (var i = 0; i < originalMesh.subMeshCount; i++)
             {
                 var textureIndex = materials[i].HasProperty("_MainTex") ? textures.Select((w, j) => (Texture: w, Index: j)).FirstOrDefault(w => w.Texture == materials[i].mainTexture).Index : GetColorIndex(materials[i], textures);
                 var offsetX = textureIndex % division * square / (float) (division * square);
                 var offsetY = 1 - (textureIndex / division + 1) * square / (float) (square * division);
 
-                foreach (var triangle in mesh.GetTriangles(i))
+                foreach (var triangle in originalMesh.GetTriangles(i))
                 {
                     if (alreadyCalculatedIds.Contains(triangle))
                         continue;
@@ -545,18 +521,24 @@ Material から検出されたテクスチャーの配置を確認します。
 
             mesh.uv = uvs;
 
-            renderer.sharedMaterials = Enumerable.Range(0, renderer.sharedMaterials.Length).Select(_ => mat).ToArray();
             renderer.gameObject.GetComponent<MeshFilter>().sharedMesh = mesh;
+            renderer.sharedMaterials = new List<Material> { mat }.ToArray();
         }
 
         private static Mesh GetOrCreateMeshClone(Mesh m, ref int c, Dictionary<int, Mesh> caches, string dest)
         {
             if (caches.ContainsKey(m.GetInstanceID()))
                 return caches[m.GetInstanceID()];
-            var cloned = Instantiate(m);
-            caches.Add(m.GetInstanceID(), cloned);
+            var mesh = Instantiate(m);
+            var triangles = new List<int>();
+            for (var i = 0; i < mesh.subMeshCount; i++)
+                triangles.AddRange(mesh.GetTriangles(i));
+            mesh.SetTriangles(triangles, 0);
+            mesh.subMeshCount = 1;
 
-            AssetDatabase.CreateAsset(cloned, $"{dest}_{c}.asset");
+            caches.Add(m.GetInstanceID(), mesh);
+
+            AssetDatabase.CreateAsset(mesh, $"{dest}_{c}.asset");
             AssetDatabase.Refresh();
 
             return AssetDatabase.LoadAssetAtPath<Mesh>($"{dest}_{c++}.asset");
@@ -564,46 +546,7 @@ Material から検出されたテクスチャーの配置を確認します。
 
         private static int GetColorIndex(Material mat, List<Texture2D> textures)
         {
-            return textures.FindIndex(w => CompareTexture(CreateTexture2DFromColor(mat.color), w));
-        }
-
-        private static bool CompareTexture(Texture2D a, Texture2D b)
-        {
-            var c1 = a.GetPixels();
-            var c2 = b.GetPixels();
-
-            if (c1.Length != c2.Length)
-                return false;
-
-            return !c1.Where((t, i) => t != c2[i]).Any();
-        }
-
-        private enum WizardPages
-        {
-            Start,
-
-            Initialize,
-
-            TextureMapping,
-
-            Configuration,
-
-            Finalize
-        }
-
-        private enum AtlasSize
-        {
-            [EnumMember(Value = "1K")]
-            One,
-
-            [EnumMember(Value = "2K")]
-            Two,
-
-            [EnumMember(Value = "4K")]
-            Four,
-
-            [EnumMember(Value = "8K")]
-            Eight
+            return textures.FindIndex(w => Texture2DUtil.CompareTexture(Texture2DUtil.CreateTexture2DFromColor(mat.color), w));
         }
 
         #region Fields
@@ -643,33 +586,6 @@ Material から検出されたテクスチャーの配置を確認します。
             EditorGUILayout.PropertyField(so.FindProperty(property), string.IsNullOrWhiteSpace(label) ? null : new GUIContent(label), true);
 
             so.ApplyModifiedProperties();
-        }
-
-        #endregion
-
-        #region Custom Field
-
-        private class DirectoryFieldAttribute : PropertyAttribute { }
-
-        [CustomPropertyDrawer(typeof(DirectoryFieldAttribute))]
-        private class DirectoryFieldDrawer : PropertyDrawer
-        {
-            public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
-            {
-                return EditorGUI.GetPropertyHeight(property, label, true);
-            }
-
-            public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
-            {
-                if (property.objectReferenceValue != null)
-                {
-                    var path = AssetDatabase.GetAssetPath(property.objectReferenceValue);
-                    if (!AssetDatabase.IsValidFolder(path))
-                        property.objectReferenceValue = null;
-                }
-
-                EditorGUI.PropertyField(position, property, label);
-            }
         }
 
         #endregion
