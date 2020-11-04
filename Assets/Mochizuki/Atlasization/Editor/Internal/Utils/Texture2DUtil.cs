@@ -41,6 +41,24 @@ namespace Mochizuki.Atlasization.Internal.Utils
             return texture;
         }
 
+        public static Texture2D CreateReadableTexture2D(Texture2D texture)
+        {
+            var renderTexture = RenderTexture.GetTemporary(texture.width, texture.height, 0, RenderTextureFormat.Default, RenderTextureReadWrite.Linear);
+            Graphics.Blit(texture, renderTexture);
+
+            var previousTexture = RenderTexture.active;
+            RenderTexture.active = renderTexture;
+
+            var readableTexture = new Texture2D(texture.width, texture.height);
+            readableTexture.ReadPixels(new Rect(0, 0, renderTexture.width, renderTexture.height), 0, 0);
+            readableTexture.Apply();
+
+            RenderTexture.active = previousTexture;
+            RenderTexture.ReleaseTemporary(renderTexture);
+
+            return readableTexture;
+        }
+
         public static bool CompareTexture(Texture2D a, Texture2D b)
         {
             var c1 = a.GetPixels();

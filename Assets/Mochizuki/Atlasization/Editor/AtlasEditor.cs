@@ -41,6 +41,10 @@ namespace Mochizuki.Atlasization
         private DefaultAsset _dest;
 
         [SerializeField]
+        [Tooltip("Unity 標準の Mesh を使う場合や、 UV は同じだが Material が異なるような Mesh が複数ある場合はチェックしてください")]
+        private bool _isSeparateMeshes;
+
+        [SerializeField]
         private List<Material> _materials;
 
         [SerializeField]
@@ -272,6 +276,13 @@ Material から検出されたテクスチャーの配置を確認します。
 
             EditorGUI.indentLevel--;
 
+            EditorGUILayout.LabelField("メッシュ設定");
+            EditorGUI.indentLevel++;
+
+            _isSeparateMeshes = EditorGUILayout.Toggle("メッシュ区別のキーに Material ID を使用する", _isSeparateMeshes);
+
+            EditorGUI.indentLevel--;
+
             EditorGUILayout.LabelField("テクスチャー設定");
             EditorGUI.indentLevel++;
 
@@ -363,7 +374,7 @@ Material から検出されたテクスチャーの配置を確認します。
 
             var baseDir = AssetDatabase.GetAssetPath(_dest);
             var atlas = CreateAtlasTexture(_textures, size, Path.Combine(baseDir, _name + ".png"));
-            CreateAtlasPrefab(_obj, _renderers, _textures, atlas, Path.Combine(baseDir, _name));
+            CreateAtlasPrefab(_obj, _renderers, _textures, atlas, Path.Combine(baseDir, _name), _isSeparateMeshes);
         }
 
         private void Cleanup()
@@ -417,7 +428,7 @@ Material から検出されたテクスチャーの配置を確認します。
             return AssetDatabase.LoadAssetAtPath<Texture2D>(dest);
         }
 
-        private static void CreateAtlasPrefab(GameObject gameObject, List<Renderer> renderers, List<Texture2D> textures, Texture2D atlas, string dest)
+        private static void CreateAtlasPrefab(GameObject gameObject, List<Renderer> renderers, List<Texture2D> textures, Texture2D atlas, string dest, bool isSeparateMeshes)
         {
             var mat = new Material(Shader.Find("Standard")) { mainTexture = atlas };
             AssetDatabase.CreateAsset(mat, $"{dest}.mat");
@@ -427,7 +438,7 @@ Material から検出されたテクスチャーの配置を確認します。
 
             var division = (int) Math.Ceiling(Math.Sqrt(textures.Count));
             var square = atlas.width / division;
-            var meshCaches = new Dictionary<int, Mesh>();
+            var meshCaches = new Dictionary<string, Mesh>();
             var meshCounter = 0;
 
             foreach (var renderer in renderers)
@@ -435,100 +446,109 @@ Material から検出されたテクスチャーの配置を確認します。
                 var r = gameObject.GetComponentsInChildren<Renderer>().First(w => w == renderer);
 
                 if (r is SkinnedMeshRenderer smr)
-                    UpdateRendererUVs(smr, division, square, textures, mat, ref meshCounter, meshCaches, dest);
+                    UpdateRendererUVs(smr, division, square, textures, mat, ref meshCounter, meshCaches, dest, isSeparateMeshes);
 
                 if (r is MeshRenderer mr)
-                    UpdateRendererUVs(mr, division, square, textures, mat, ref meshCounter, meshCaches, dest);
+                    UpdateRendererUVs(mr, division, square, textures, mat, ref meshCounter, meshCaches, dest, isSeparateMeshes);
             }
 
             PrefabUtility.SaveAsPrefabAsset(gameObject, $"{dest}.prefab");
             DestroyImmediate(gameObject);
         }
 
-        private static void UpdateRendererUVs(SkinnedMeshRenderer renderer, int division, int square, List<Texture2D> textures, Material mat, ref int meshCounter, Dictionary<int, Mesh> meshCaches, string dest)
+        private static void UpdateRendererUVs(SkinnedMeshRenderer renderer, int division, int square, List<Texture2D> textures, Material mat, ref int meshCounter, Dictionary<string, Mesh> meshCaches, string dest, bool isSeparateMeshes)
         {
             var originalMesh = renderer.sharedMesh;
-            var mesh = GetOrCreateMeshClone(originalMesh, ref meshCounter, meshCaches, dest);
-            var uvs = mesh.uv;
-            var materials = renderer.sharedMaterials;
+            var (mesh, alreadyProcessed) = GetOrCreateMeshClone(originalMesh, renderer, ref meshCounter, meshCaches, dest, isSeparateMeshes);
 
-            var uvX = (float) square / (division * square);
-            var uvY = (float) square / (division * square);
-
-            var alreadyCalculatedIds = new List<int>();
-
-            for (var i = 0; i < originalMesh.subMeshCount; i++)
+            if (alreadyProcessed)
             {
-                var textureIndex = materials[i].HasProperty("_MainTex") ? textures.Select((w, j) => (Texture: w, Index: j)).FirstOrDefault(w => w.Texture == materials[i].mainTexture).Index : GetColorIndex(materials[i], textures);
-                var offsetX = textureIndex % division * square / (float) (division * square);
-                var offsetY = 1 - (textureIndex / division + 1) * square / (float) (square * division);
+                var uvs = mesh.uv;
+                var materials = renderer.sharedMaterials;
 
-                foreach (var triangle in originalMesh.GetTriangles(i))
+                var uvX = (float) square / (division * square);
+                var uvY = (float) square / (division * square);
+
+                var alreadyCalculatedIds = new List<int>();
+
+                for (var i = 0; i < originalMesh.subMeshCount; i++)
                 {
-                    if (alreadyCalculatedIds.Contains(triangle))
-                        continue;
+                    var textureIndex = GetTextureIndex(materials[i], textures);
+                    var offsetX = textureIndex % division * square / (float) (division * square);
+                    var offsetY = 1 - (textureIndex / division + 1) * square / (float) (square * division);
 
-                    var uv = uvs[triangle];
+                    foreach (var triangle in originalMesh.GetTriangles(i))
+                    {
+                        if (alreadyCalculatedIds.Contains(triangle))
+                            continue;
 
-                    uv.x = uv.x * uvX + offsetX;
-                    uv.y = uv.y * uvY + offsetY;
+                        var uv = uvs[triangle];
 
-                    alreadyCalculatedIds.Add(triangle);
+                        uv.x = uv.x * uvX + offsetX;
+                        uv.y = uv.y * uvY + offsetY;
 
-                    uvs[triangle] = uv;
+                        alreadyCalculatedIds.Add(triangle);
+
+                        uvs[triangle] = uv;
+                    }
                 }
-            }
 
-            mesh.uv = uvs;
+                mesh.uv = uvs;
+            }
 
             renderer.sharedMesh = mesh;
             renderer.sharedMaterials = new List<Material> { mat }.ToArray();
         }
 
-        private static void UpdateRendererUVs(MeshRenderer renderer, int division, int square, List<Texture2D> textures, Material mat, ref int meshCounter, Dictionary<int, Mesh> meshCaches, string dest)
+        private static void UpdateRendererUVs(MeshRenderer renderer, int division, int square, List<Texture2D> textures, Material mat, ref int meshCounter, Dictionary<string, Mesh> meshCaches, string dest, bool isSeparateMeshes)
         {
             var originalMesh = renderer.gameObject.GetComponent<MeshFilter>().sharedMesh;
-            var mesh = GetOrCreateMeshClone(originalMesh, ref meshCounter, meshCaches, dest);
-            var uvs = mesh.uv;
-            var materials = renderer.sharedMaterials;
+            var (mesh, alreadyProcessed) = GetOrCreateMeshClone(originalMesh, renderer, ref meshCounter, meshCaches, dest, isSeparateMeshes);
 
-            var uvX = (float) square / (division * square);
-            var uvY = (float) square / (division * square);
-
-            var alreadyCalculatedIds = new List<int>();
-
-            for (var i = 0; i < originalMesh.subMeshCount; i++)
+            if (!alreadyProcessed)
             {
-                var textureIndex = materials[i].HasProperty("_MainTex") ? textures.Select((w, j) => (Texture: w, Index: j)).FirstOrDefault(w => w.Texture == materials[i].mainTexture).Index : GetColorIndex(materials[i], textures);
-                var offsetX = textureIndex % division * square / (float) (division * square);
-                var offsetY = 1 - (textureIndex / division + 1) * square / (float) (square * division);
+                var uvs = mesh.uv;
+                var materials = renderer.sharedMaterials;
 
-                foreach (var triangle in originalMesh.GetTriangles(i))
+                var uvX = (float) square / (division * square);
+                var uvY = (float) square / (division * square);
+
+                var alreadyCalculatedIds = new List<int>();
+
+                for (var i = 0; i < originalMesh.subMeshCount; i++)
                 {
-                    if (alreadyCalculatedIds.Contains(triangle))
-                        continue;
+                    var textureIndex = GetTextureIndex(materials[i], textures);
+                    var offsetX = textureIndex % division * square / (float) (division * square);
+                    var offsetY = 1 - (textureIndex / division + 1) * square / (float) (square * division);
 
-                    var uv = uvs[triangle];
+                    foreach (var triangle in originalMesh.GetTriangles(i))
+                    {
+                        if (alreadyCalculatedIds.Contains(triangle))
+                            continue;
 
-                    uv.x = uv.x * uvX + offsetX;
-                    uv.y = uv.y * uvY + offsetY;
+                        var uv = uvs[triangle];
 
-                    alreadyCalculatedIds.Add(triangle);
+                        uv.x = uv.x * uvX + offsetX;
+                        uv.y = uv.y * uvY + offsetY;
 
-                    uvs[triangle] = uv;
+                        alreadyCalculatedIds.Add(triangle);
+
+                        uvs[triangle] = uv;
+                    }
                 }
-            }
 
-            mesh.uv = uvs;
+                mesh.uv = uvs;
+            }
 
             renderer.gameObject.GetComponent<MeshFilter>().sharedMesh = mesh;
             renderer.sharedMaterials = new List<Material> { mat }.ToArray();
         }
 
-        private static Mesh GetOrCreateMeshClone(Mesh m, ref int c, Dictionary<int, Mesh> caches, string dest)
+        private static (Mesh, bool) GetOrCreateMeshClone(Mesh m, Renderer renderer, ref int c, Dictionary<string, Mesh> caches, string dest, bool isSeparateMeshes)
         {
-            if (caches.ContainsKey(m.GetInstanceID()))
-                return caches[m.GetInstanceID()];
+            var key = isSeparateMeshes ? $"{m.GetInstanceID()}-{string.Join(",", renderer.sharedMaterials.Select(w => w.GetInstanceID()))}" : $"{m.GetInstanceID()}";
+            if (caches.ContainsKey(key))
+                return (caches[key], true); // SHOULD NOT change UVs, because this mesh already changed UVs.
             var mesh = Instantiate(m);
             var triangles = new List<int>();
             for (var i = 0; i < mesh.subMeshCount; i++)
@@ -536,12 +556,25 @@ Material から検出されたテクスチャーの配置を確認します。
             mesh.SetTriangles(triangles, 0);
             mesh.subMeshCount = 1;
 
-            caches.Add(m.GetInstanceID(), mesh);
+            caches.Add(key, mesh);
 
             AssetDatabase.CreateAsset(mesh, $"{dest}_{c}.asset");
             AssetDatabase.Refresh();
 
-            return AssetDatabase.LoadAssetAtPath<Mesh>($"{dest}_{c++}.asset");
+            return (AssetDatabase.LoadAssetAtPath<Mesh>($"{dest}_{c++}.asset"), false);
+        }
+
+        private static int GetTextureIndex(Material material, List<Texture2D> textures)
+        {
+            if (material.HasProperty("_MainTex") && material.mainTexture != null)
+                return GetTextureIndex((Texture2D) material.mainTexture, textures);
+            return GetColorIndex(material, textures);
+        }
+
+        private static int GetTextureIndex(Texture2D texture, List<Texture2D> textures)
+        {
+            var readable = Texture2DUtil.CreateReadableTexture2D(texture);
+            return textures.FindIndex(w => Texture2DUtil.CompareTexture(readable, w));
         }
 
         private static int GetColorIndex(Material mat, List<Texture2D> textures)
