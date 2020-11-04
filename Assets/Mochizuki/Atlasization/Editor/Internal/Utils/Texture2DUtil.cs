@@ -13,6 +13,35 @@ namespace Mochizuki.Atlasization.Internal.Utilities
 {
     internal static class TextureUtils
     {
+        private static readonly Dictionary<TextureFormat, RenderTextureFormat> FormatAliasMap = new Dictionary<TextureFormat, RenderTextureFormat>
+        {
+            { TextureFormat.Alpha8, RenderTextureFormat.ARGB32 },
+            { TextureFormat.ARGB4444, RenderTextureFormat.ARGB4444 },
+            { TextureFormat.RGB24, RenderTextureFormat.ARGB32 },
+            { TextureFormat.RGBA32, RenderTextureFormat.ARGB32 },
+            { TextureFormat.ARGB32, RenderTextureFormat.ARGB32 },
+            { TextureFormat.RGB565, RenderTextureFormat.RGB565 },
+            { TextureFormat.R16, RenderTextureFormat.R16 },
+            { TextureFormat.DXT1, RenderTextureFormat.ARGB32 },
+            { TextureFormat.DXT5, RenderTextureFormat.ARGB32 },
+            { TextureFormat.RGBA4444, RenderTextureFormat.ARGB4444 },
+            { TextureFormat.BGRA32, RenderTextureFormat.ARGB32 },
+            { TextureFormat.RHalf, RenderTextureFormat.RHalf },
+            { TextureFormat.RGHalf, RenderTextureFormat.RGHalf },
+            { TextureFormat.RGBAHalf, RenderTextureFormat.ARGBHalf },
+            { TextureFormat.RFloat, RenderTextureFormat.RFloat },
+            { TextureFormat.RGFloat, RenderTextureFormat.RGFloat },
+            { TextureFormat.RGBAFloat, RenderTextureFormat.ARGBFloat },
+            { TextureFormat.RGB9e5Float, RenderTextureFormat.ARGBHalf }
+        };
+
+        public static RenderTextureFormat ConvertToRenderTextureFormat(TextureFormat format)
+        {
+            if (FormatAliasMap.ContainsKey(format))
+                return FormatAliasMap[format];
+            throw new NotSupportedException();
+        }
+
         public static Texture2D ResizeTexture(Texture2D texture, int size)
         {
             // Graphics.ConvertTexture write pixels to GPU
@@ -45,7 +74,7 @@ namespace Mochizuki.Atlasization.Internal.Utilities
 
         public static Texture2D CreateReadableTexture2D(Texture2D texture)
         {
-            var renderTexture = RenderTexture.GetTemporary(texture.width, texture.height, 0, RenderTextureFormat.Default, RenderTextureReadWrite.Linear);
+            var renderTexture = RenderTexture.GetTemporary(texture.width, texture.height, 0, ConvertToRenderTextureFormat(texture.format));
             Graphics.Blit(texture, renderTexture);
 
             var previousTexture = RenderTexture.active;
