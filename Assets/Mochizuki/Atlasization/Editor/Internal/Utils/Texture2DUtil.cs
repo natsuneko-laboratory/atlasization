@@ -3,13 +3,15 @@
  * Licensed under the MIT License. See LICENSE in the project root for license information.
  *------------------------------------------------------------------------------------------*/
 
+using System;
+using System.Collections.Generic;
 using System.Linq;
 
 using UnityEngine;
 
-namespace Mochizuki.Atlasization.Internal.Utils
+namespace Mochizuki.Atlasization.Internal.Utilities
 {
-    internal static class Texture2DUtil
+    internal static class TextureUtils
     {
         public static Texture2D ResizeTexture(Texture2D texture, int size)
         {
@@ -29,7 +31,7 @@ namespace Mochizuki.Atlasization.Internal.Utils
             return b;
         }
 
-        public static Texture2D CreateTexture2DFromColor(Color color)
+        public static Texture2D CreateTextureFromColor(Color color)
         {
             var texture = new Texture2D(128, 128);
             for (var i = 0; i < texture.height; i++)

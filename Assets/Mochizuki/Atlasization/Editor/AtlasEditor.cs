@@ -8,18 +8,14 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Runtime.Serialization;
-using System.Text.RegularExpressions;
 
 using Mochizuki.Atlasization.Internal.Attributes;
 using Mochizuki.Atlasization.Internal.Enum;
-using Mochizuki.Atlasization.Internal.Utils;
+using Mochizuki.Atlasization.Internal.Utilities;
 
 using UnityEditor;
 
 using UnityEngine;
-
-using Object = UnityEngine.Object;
 
 namespace Mochizuki.Atlasization
 {
@@ -184,7 +180,7 @@ Unity 上でアトラス化作業を行えるエディター拡張です。
             EditorGUILayout.Space();
             EditorGUI.BeginChangeCheck();
 
-            _original = ObjectPicker("アトラス化を行う Prefab", _original);
+            _original = CustomField.ObjectPicker("アトラス化を行う Prefab", _original);
 
             if (EditorGUI.EndChangeCheck())
             {
@@ -208,7 +204,7 @@ Unity 上でアトラス化作業を行えるエディター拡張です。
             if (_renderers?.Count != 0)
                 return _original != null;
 
-            ErrorField("Prefab もしくは GameObject に何らかの Renderer コンポーネントが含まれていません");
+            CustomField.ErrorField("Prefab もしくは GameObject に何らかの Renderer コンポーネントが含まれていません");
             return false;
         }
 
@@ -226,7 +222,8 @@ Material から検出されたテクスチャーの配置を確認します。
 
             if (_shouldGenerateColorTextures)
             {
-                _textures.AddRange(_colors.Select(Texture2DUtil.CreateTexture2DFromColor));
+                _textures = _textures.Select(TextureUtils.CreateReadableTexture2D).ToList();
+                _textures.AddRange(_colors.Select(TextureUtils.CreateTextureFromColor));
                 _shouldGenerateColorTextures = false;
             }
 
@@ -251,7 +248,7 @@ Material から検出されたテクスチャーの配置を確認します。
             using (new EditorGUI.DisabledGroupScope(true))
             {
                 foreach (var texture in _textures)
-                    ObjectPicker(string.IsNullOrWhiteSpace(texture.name) ? "Auto Generated" : texture.name, texture);
+                    CustomField.ObjectPicker(string.IsNullOrWhiteSpace(texture.name) ? "Auto Generated" : texture.name, texture);
             }
 
             return true;
@@ -272,7 +269,7 @@ Material から検出されたテクスチャーの配置を確認します。
             EditorGUILayout.LabelField("グローバル設定");
             EditorGUI.indentLevel++;
 
-            PropertyField(this, nameof(_dest), "出力先ディレクトリ");
+            CustomField.PropertyField(this, nameof(_dest), "出力先ディレクトリ");
 
             EditorGUI.indentLevel--;
 
@@ -286,7 +283,7 @@ Material から検出されたテクスチャーの配置を確認します。
             EditorGUILayout.LabelField("テクスチャー設定");
             EditorGUI.indentLevel++;
 
-            _size = EnumField("出力サイズ (K)", _size);
+            _size =CustomField. EnumField("出力サイズ (K)", _size);
             _name = EditorGUILayout.TextField("出力ファイル名", _name ?? _original.name);
 
             EditorGUI.indentLevel--;
@@ -306,7 +303,7 @@ Material から検出されたテクスチャーの配置を確認します。
 
             using (new EditorGUI.DisabledGroupScope(true))
             {
-                ObjectPicker("対象の Prefab", _original);
+                CustomField.ObjectPicker("対象の Prefab", _original);
 
                 EditorGUI.indentLevel++;
                 EditorGUILayout.LabelField($"対象の Renderer Count : {_renderers.Count}");
@@ -333,13 +330,13 @@ Material から検出されたテクスチャーの配置を確認します。
 
                 EditorGUILayout.LabelField("テクスチャー設定");
                 EditorGUI.indentLevel++;
-                EnumField("出力サイズ (K)", _size);
+                CustomField.EnumField("出力サイズ (K)", _size);
                 EditorGUILayout.TextField("出力ファイル名", _name);
                 EditorGUI.indentLevel--;
 
                 EditorGUILayout.LabelField("グローバル設定");
                 EditorGUI.indentLevel++;
-                PropertyField(this, nameof(_dest), "出力先ディレクトリ");
+                CustomField.PropertyField(this, nameof(_dest), "出力先ディレクトリ");
                 EditorGUI.indentLevel--;
             }
 
@@ -404,7 +401,7 @@ Material から検出されたテクスチャーの配置を確認します。
                         break;
 
                     var x = j * square;
-                    var texture = Texture2DUtil.ResizeTexture(textures[k++], square);
+                    var texture = TextureUtils.ResizeTexture(textures[k++], square);
 
                     for (var m = 0; m < square; m++)
                     for (var n = 0; n < square; n++)
@@ -573,54 +570,13 @@ Material から検出されたテクスチャーの配置を確認します。
 
         private static int GetTextureIndex(Texture2D texture, List<Texture2D> textures)
         {
-            var readable = Texture2DUtil.CreateReadableTexture2D(texture);
-            return textures.FindIndex(w => Texture2DUtil.CompareTexture(readable, w));
+            var readable = TextureUtils.CreateReadableTexture2D(texture);
+            return textures.FindIndex(w => TextureUtils.CompareTexture(readable, w));
         }
 
         private static int GetColorIndex(Material mat, List<Texture2D> textures)
         {
-            return textures.FindIndex(w => Texture2DUtil.CompareTexture(Texture2DUtil.CreateTexture2DFromColor(mat.color), w));
+            return textures.FindIndex(w => TextureUtils.CompareTexture(TextureUtils.CreateTextureFromColor(mat.color), w));
         }
-
-        #region Fields
-
-        private static T EnumField<T>(string label, T value) where T : Enum
-        {
-            string GetEnumMemberValue<T1>(string name)
-            {
-                var member = typeof(T1).GetMember(name);
-                var attr = member[0].GetCustomAttributes(false).OfType<EnumMemberAttribute>().First();
-                return attr?.Value;
-            }
-
-            var items = Enum.GetNames(typeof(T))
-                            .Select(w => GetEnumMemberValue<T>(w) ?? Regex.Replace(w, "(\\B[A-Z])", " $1"))
-                            .Select(w => new GUIContent(w))
-                            .ToArray();
-
-            return (T) (object) EditorGUILayout.Popup(new GUIContent(label), (int) (object) value, items);
-        }
-
-        private static void ErrorField(string error)
-        {
-            EditorGUILayout.HelpBox(error, MessageType.Error);
-        }
-
-        private static T ObjectPicker<T>(string label, T obj) where T : Object
-        {
-            return EditorGUILayout.ObjectField(new GUIContent(label), obj, typeof(T), true) as T;
-        }
-
-        private static void PropertyField(EditorWindow editor, string property, string label = null)
-        {
-            var so = new SerializedObject(editor);
-            so.Update();
-
-            EditorGUILayout.PropertyField(so.FindProperty(property), string.IsNullOrWhiteSpace(label) ? null : new GUIContent(label), true);
-
-            so.ApplyModifiedProperties();
-        }
-
-        #endregion
     }
 }
