@@ -59,6 +59,7 @@ namespace Mochizuki.Atlasization
             _wizardPages.Add(new InitialPage());
             _wizardPages.Add(new MeshMappingPage());
             _wizardPages.Add(new TextureMappingPage());
+            _wizardPages.Add(new ShaderSettings());
             _wizardPages.Add(new ConfigurationPage());
             _wizardPages.Add(new ConfirmationPage());
 

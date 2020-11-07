@@ -15,6 +15,8 @@ namespace Mochizuki.Atlasization.Internal.Enum
 
         TextureMapping,
 
+        ShaderSettings,
+
         Configuration,
 
         Finalize

@@ -84,8 +84,14 @@ namespace Mochizuki.Atlasization.Internal.Wizard
             texture.Create(configuration.Textures, configuration.TextureDivision);
             texture.SaveAsAsset($"{configuration.DestPath}.png");
 
-            var material = texture.CreateMaterial("Standard");
-            material.SaveAsAsset($"{configuration.DestPath}.mat");
+            var materials = new List<AtlasMaterial>();
+            foreach (var (material, idx) in configuration.NewMaterials.Select((w, i) => (w, i)))
+            {
+                var mat = texture.CreateMaterial(material);
+                mat.SaveAsAsset($"{configuration.DestPath}_{idx}.mat");
+
+                materials.Add(mat);
+            }
 
             var meshes = new Dictionary<string, AtlasMesh>();
             var counter = 0;
@@ -94,8 +100,9 @@ namespace Mochizuki.Atlasization.Internal.Wizard
                 var mesh = new AtlasMesh(renderer, configuration.IsUseMaterialKey);
                 if (meshes.ContainsKey(mesh.CalcMaterialKey()))
                 {
-                    meshes[mesh.CalcMaterialKey()].ApplyTo(renderer);
-                    renderer.sharedMaterials = Enumerable.Range(0, renderer.sharedMaterials.Length).Select(w => material.Actual).ToArray();
+                    var m = meshes[mesh.CalcMaterialKey()];
+                    m.ApplyTo(renderer);
+                    renderer.sharedMaterials = Enumerable.Range(0, m.Channels).Select(w => materials[w]).Select(w => w.Actual).ToArray();
                     continue;
                 }
 
@@ -117,7 +124,7 @@ namespace Mochizuki.Atlasization.Internal.Wizard
                 mesh.Apply();
 
                 meshes.Add(mesh.CalcMaterialKey(), mesh);
-                renderer.sharedMaterials = Enumerable.Range(0, renderer.sharedMaterials.Length).Select(_ => material.Actual).ToArray();
+                renderer.sharedMaterials = Enumerable.Range(0, reduceTo).Select(w => materials[w]).Select(w => w.Actual).ToArray();
             }
 
             PrefabUtility.SaveAsPrefabAsset(configuration.GameObject, $"{configuration.DestPath}.prefab");

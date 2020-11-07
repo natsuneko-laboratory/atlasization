@@ -20,6 +20,12 @@ namespace Mochizuki.Atlasization.Internal.Models
             _material = new Material(Shader.Find(name)) { mainTexture = texture };
         }
 
+        public AtlasMaterial(Material material, Texture texture)
+        {
+            _material = Object.Instantiate(material);
+            _material.mainTexture = texture;
+        }
+
         public Material SaveAsAsset(string path)
         {
             AssetDatabase.CreateAsset(_material, path);

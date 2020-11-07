@@ -69,6 +69,14 @@ namespace Mochizuki.Atlasization.Internal.Models
             return new AtlasMaterial(name, _actualTexture);
         }
 
+        public AtlasMaterial CreateMaterial(Material material)
+        {
+            if (_actualTexture == null)
+                throw new InvalidOperationException($"You must call {nameof(SaveAsAsset)} before this.");
+
+            return new AtlasMaterial(material, _actualTexture);
+        }
+
         public Texture2D SaveAsAsset(string path)
         {
             File.WriteAllBytes(path, _texture.EncodeToPNG());

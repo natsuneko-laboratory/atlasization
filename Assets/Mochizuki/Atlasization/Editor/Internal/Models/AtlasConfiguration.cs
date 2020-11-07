@@ -36,6 +36,8 @@ namespace Mochizuki.Atlasization.Internal.Models
 
         public Mode Mode { get; set; }
 
+        public List<Material> NewMaterials { get; }
+
         public List<Renderer> Renderers { get; }
 
         public List<ReadableTexture2D> Textures { get; }
@@ -51,6 +53,7 @@ namespace Mochizuki.Atlasization.Internal.Models
             Colors = new List<Color>();
             Materials = new List<Material>();
             MeshLayouts = new List<AtlasMeshLayout>();
+            NewMaterials = new List<Material>();
             Renderers = new List<Renderer>();
             Textures = new List<ReadableTexture2D>();
         }

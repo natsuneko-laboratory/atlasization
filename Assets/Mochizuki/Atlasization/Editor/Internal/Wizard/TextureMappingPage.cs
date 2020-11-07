@@ -58,7 +58,11 @@ Material から検出されたテクスチャーの配置を確認します。
             return true;
         }
 
-        public void OnFinalize(AtlasConfiguration configuration) { }
+        public void OnFinalize(AtlasConfiguration configuration)
+        {
+            configuration.TextureLayouts.Clear();
+            configuration.TextureLayouts.AddRange(_textureLayouts);
+        }
 
         public void OnDiscard() { }
     }
