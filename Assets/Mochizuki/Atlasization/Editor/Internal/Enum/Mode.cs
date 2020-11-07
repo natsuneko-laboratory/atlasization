@@ -5,16 +5,10 @@
 
 namespace Mochizuki.Atlasization.Internal.Enum
 {
-    internal enum WizardPage
+    internal enum Mode
     {
-        Start,
+        Standard,
 
-        Initialize,
-
-        TextureMapping,
-
-        Configuration,
-
-        Finalize
+        Professional
     }
 }

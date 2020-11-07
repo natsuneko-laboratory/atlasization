@@ -5,7 +5,8 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
+
+using Mochizuki.Atlasization.Internal.Models;
 
 using UnityEngine;
 
@@ -32,7 +33,18 @@ namespace Mochizuki.Atlasization.Internal.Utilities
             { TextureFormat.RFloat, RenderTextureFormat.RFloat },
             { TextureFormat.RGFloat, RenderTextureFormat.RGFloat },
             { TextureFormat.RGBAFloat, RenderTextureFormat.ARGBFloat },
-            { TextureFormat.RGB9e5Float, RenderTextureFormat.ARGBHalf }
+            { TextureFormat.RGB9e5Float, RenderTextureFormat.ARGBHalf },
+            { TextureFormat.BC6H, RenderTextureFormat.ARGBHalf },
+            { TextureFormat.BC7, RenderTextureFormat.ARGB32 },
+            { TextureFormat.BC4, RenderTextureFormat.R8 },
+            { TextureFormat.BC5, RenderTextureFormat.RGHalf },
+            { TextureFormat.DXT1Crunched, RenderTextureFormat.ARGB32 },
+            { TextureFormat.DXT5Crunched, RenderTextureFormat.ARGB32 },
+            { TextureFormat.PVRTC_RGB2, RenderTextureFormat.ARGB32 },
+            { TextureFormat.PVRTC_RGBA2, RenderTextureFormat.ARGB32 },
+            { TextureFormat.PVRTC_RGB4, RenderTextureFormat.ARGB32 },
+            { TextureFormat.PVRTC_RGBA4, RenderTextureFormat.ARGB32 },
+            { TextureFormat.ETC_RGB4, RenderTextureFormat.ARGB32 }
         };
 
         public static RenderTextureFormat ConvertToRenderTextureFormat(TextureFormat format)
@@ -44,6 +56,8 @@ namespace Mochizuki.Atlasization.Internal.Utilities
 
         public static Texture2D ResizeTexture(Texture2D texture, int size)
         {
+            var c = RenderTexture.active;
+
             // Graphics.ConvertTexture write pixels to GPU
             var a = new Texture2D(size, size);
             Graphics.ConvertTexture(texture, a);
@@ -55,12 +69,14 @@ namespace Mochizuki.Atlasization.Internal.Utilities
 
             var b = new Texture2D(size, size);
             b.ReadPixels(new Rect(0, 0, size, size), 0, 0, false);
+
             RenderTexture.ReleaseTemporary(r);
+            RenderTexture.active = c;
 
             return b;
         }
 
-        public static Texture2D CreateTextureFromColor(Color color)
+        public static ReadableTexture2D CreateTextureFromColor(Color color)
         {
             var texture = new Texture2D(128, 128);
             for (var i = 0; i < texture.height; i++)
@@ -69,36 +85,25 @@ namespace Mochizuki.Atlasization.Internal.Utilities
 
             texture.Apply();
 
-            return texture;
+            return new ReadableTexture2D(texture, null);
         }
 
-        public static Texture2D CreateReadableTexture2D(Texture2D texture)
+        public static ReadableTexture2D CreateReadableTexture2D(Texture2D texture)
         {
-            var renderTexture = RenderTexture.GetTemporary(texture.width, texture.height, 0, ConvertToRenderTextureFormat(texture.format));
-            Graphics.Blit(texture, renderTexture);
+            var r = RenderTexture.GetTemporary(texture.width, texture.height, 0, ConvertToRenderTextureFormat(texture.format));
+            Graphics.Blit(texture, r);
 
-            var previousTexture = RenderTexture.active;
-            RenderTexture.active = renderTexture;
+            var c = RenderTexture.active;
+            RenderTexture.active = r;
 
             var readableTexture = new Texture2D(texture.width, texture.height);
-            readableTexture.ReadPixels(new Rect(0, 0, renderTexture.width, renderTexture.height), 0, 0);
+            readableTexture.ReadPixels(new Rect(0, 0, r.width, r.height), 0, 0);
             readableTexture.Apply();
 
-            RenderTexture.active = previousTexture;
-            RenderTexture.ReleaseTemporary(renderTexture);
+            RenderTexture.ReleaseTemporary(r);
+            RenderTexture.active = c;
 
-            return readableTexture;
-        }
-
-        public static bool CompareTexture(Texture2D a, Texture2D b)
-        {
-            var c1 = a.GetPixels();
-            var c2 = b.GetPixels();
-
-            if (c1.Length != c2.Length)
-                return false;
-
-            return !c1.Where((t, i) => t != c2[i]).Any();
+            return new ReadableTexture2D(readableTexture, texture);
         }
     }
 }

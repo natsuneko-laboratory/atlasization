@@ -13,7 +13,7 @@ namespace Mochizuki.Atlasization.Internal.Utilities
         public static string GetEnumMemberValue<T>(string value) where T : System.Enum
         {
             var member = typeof(T).GetMember(value);
-            var attr = member[0].GetCustomAttributes(false).OfType<EnumMemberAttribute>().First();
+            var attr = member[0].GetCustomAttributes(false).OfType<EnumMemberAttribute>().FirstOrDefault();
             return attr?.Value;
         }
     }
