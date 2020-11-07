@@ -3,6 +3,9 @@
  * Licensed under the MIT License. See LICENSE in the project root for license information.
  *------------------------------------------------------------------------------------------*/
 
+using System.Collections.Generic;
+using System.Linq;
+
 using Mochizuki.Atlasization.Internal.Enum;
 using Mochizuki.Atlasization.Internal.Models;
 using Mochizuki.Atlasization.Internal.Utilities;
@@ -15,9 +18,15 @@ namespace Mochizuki.Atlasization.Internal.Wizard
 {
     internal class TextureMappingPage : IWizardPage
     {
+        private List<AtlasTextureLayout> _textureLayouts;
+
         public WizardPage PageId => WizardPage.TextureMapping;
 
         public void OnInitialize() { }
+
+        public void OnAwake(AtlasConfiguration configuration)
+        {
+        }
 
         public bool OnGui(AtlasConfiguration configuration)
         {
@@ -37,14 +46,14 @@ Material から検出されたテクスチャーの配置を確認します。
 
             EditorGUILayout.LabelField($"Texture2D References ({configuration.Textures.Count} Textures, {configuration.Materials.Count} Materials) : ");
 
-            using (new EditorGUI.DisabledGroupScope(true))
-            {
-                foreach (var texture in configuration.Textures)
+            foreach (var (texture, i) in configuration.Textures.Select((w, i) => (w, i)))
+                using (new EditorGUI.DisabledGroupScope(true))
+                {
                     if (string.IsNullOrWhiteSpace(texture.Original?.name))
                         CustomField.ObjectPicker("Auto Generated", texture.Texture);
                     else
                         CustomField.ObjectPicker(texture.Original.name, texture.Original);
-            }
+                }
 
             return true;
         }

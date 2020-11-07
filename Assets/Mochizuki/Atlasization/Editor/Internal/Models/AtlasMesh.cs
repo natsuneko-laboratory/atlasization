@@ -49,6 +49,21 @@ namespace Mochizuki.Atlasization.Internal.Models
             return $"Mesh: {_sharedMesh.GetInstanceID()}, Materials: null";
         }
 
+        public List<int> GetChannels(List<AtlasMeshLayout> layouts)
+        {
+            var slots = new List<int>();
+
+            foreach (var (material, idx) in _renderer.sharedMaterials.Select((w, i) => (w, i)))
+            {
+                if (layouts.FirstOrDefault(w => w.Material == material) == null)
+                    continue;
+
+                slots.Add(idx);
+            }
+
+            return slots;
+        }
+
         public void Apply()
         {
             ApplyTo(_renderer);

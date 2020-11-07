@@ -32,6 +32,8 @@ namespace Mochizuki.Atlasization.Internal.Models
 
         public List<Material> Materials { get; }
 
+        public List<AtlasMeshLayout> MeshLayouts { get; }
+
         public Mode Mode { get; set; }
 
         public List<Renderer> Renderers { get; }
@@ -40,12 +42,15 @@ namespace Mochizuki.Atlasization.Internal.Models
 
         public int TextureDivision => (int) Math.Ceiling(Math.Sqrt(Textures.Count));
 
+        public List<AtlasTextureLayout> TextureLayouts { get; }
+
         public GameObject Workspace { get; set; }
 
         public AtlasConfiguration()
         {
             Colors = new List<Color>();
             Materials = new List<Material>();
+            MeshLayouts = new List<AtlasMeshLayout>();
             Renderers = new List<Renderer>();
             Textures = new List<ReadableTexture2D>();
         }

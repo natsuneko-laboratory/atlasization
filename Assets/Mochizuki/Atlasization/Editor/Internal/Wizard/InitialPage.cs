@@ -28,6 +28,8 @@ namespace Mochizuki.Atlasization.Internal.Wizard
             _gameObject = null;
         }
 
+        public void OnAwake(AtlasConfiguration configuration) { }
+
         public bool OnGui(AtlasConfiguration configuration)
         {
             using (new EditorGUILayout.VerticalScope(GUI.skin.box))
@@ -65,15 +67,21 @@ namespace Mochizuki.Atlasization.Internal.Wizard
 
         public void OnFinalize(AtlasConfiguration configuration)
         {
-            _workspace = new GameObject("Mochizuki.Workspace (DO NOT EDIT THIS)");
-            configuration.GameObject = Object.Instantiate(_gameObject, _workspace.transform);
-            configuration.Workspace = _workspace;
+            if (_workspace == null)
+            {
+                _workspace = new GameObject("Mochizuki.Workspace (DO NOT EDIT THIS)");
+                configuration.GameObject = Object.Instantiate(_gameObject, _workspace.transform);
+                configuration.Workspace = _workspace;
+            }
 
             configuration.Renderers.Clear();
             configuration.Renderers.AddRange(configuration.GameObject.GetComponentsInChildren<Renderer>().Where(w => w is SkinnedMeshRenderer || w is MeshRenderer));
 
             configuration.Materials.Clear();
             configuration.Materials.AddRange(configuration.Renderers.SelectMany(w => w.sharedMaterials).Distinct());
+
+            configuration.MeshLayouts.Clear();
+            configuration.MeshLayouts.AddRange(configuration.Materials.Select(w => new AtlasMeshLayout(w)));
 
             configuration.Textures.Clear();
             configuration.Textures.AddRange(CollectTexturesFromMaterial(configuration.Materials));

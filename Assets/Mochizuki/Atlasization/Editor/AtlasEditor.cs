@@ -57,9 +57,12 @@ namespace Mochizuki.Atlasization
             _wizardPages.Clear();
             _wizardPages.Add(new StartPage());
             _wizardPages.Add(new InitialPage());
+            _wizardPages.Add(new MeshMappingPage());
             _wizardPages.Add(new TextureMappingPage());
             _wizardPages.Add(new ConfigurationPage());
             _wizardPages.Add(new ConfirmationPage());
+
+            _wizardPages.ForEach(w => w.OnInitialize());
         }
 
         private void OnGUI()
@@ -107,7 +110,12 @@ namespace Mochizuki.Atlasization
                 }
 
                 if (_current != previous)
+                {
+                    if (_current < previous)
+                        page.OnDiscard();
+                    _wizardPages.First(w => w.PageId == _current).OnAwake(_configuration);
                     _scroll = Vector2.zero;
+                }
             }
             catch (Exception e)
             {

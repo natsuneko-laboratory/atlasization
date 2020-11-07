@@ -3,20 +3,19 @@
  * Licensed under the MIT License. See LICENSE in the project root for license information.
  *------------------------------------------------------------------------------------------*/
 
-namespace Mochizuki.Atlasization.Internal.Enum
+using UnityEngine;
+
+namespace Mochizuki.Atlasization.Internal.Models
 {
-    internal enum WizardPage
+    internal class AtlasMeshLayout
     {
-        Start,
+        public int Channel { get; set; }
 
-        Initialize,
+        public Material Material { get; }
 
-        MeshMapping,
-
-        TextureMapping,
-
-        Configuration,
-
-        Finalize
+        public AtlasMeshLayout(Material material)
+        {
+            Material = material;
+        }
     }
 }

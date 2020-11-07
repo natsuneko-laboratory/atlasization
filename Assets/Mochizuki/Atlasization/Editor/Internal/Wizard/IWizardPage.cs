@@ -14,6 +14,8 @@ namespace Mochizuki.Atlasization.Internal.Wizard
 
         void OnInitialize();
 
+        void OnAwake(AtlasConfiguration configuration);
+
         bool OnGui(AtlasConfiguration configuration);
 
         void OnFinalize(AtlasConfiguration configuration);

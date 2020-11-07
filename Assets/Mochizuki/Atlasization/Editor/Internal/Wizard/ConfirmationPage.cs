@@ -23,6 +23,8 @@ namespace Mochizuki.Atlasization.Internal.Wizard
 
         public void OnInitialize() { }
 
+        public void OnAwake(AtlasConfiguration configuration) { }
+
         public bool OnGui(AtlasConfiguration configuration)
         {
             using (new EditorGUILayout.VerticalScope(GUI.skin.box))
@@ -42,6 +44,16 @@ namespace Mochizuki.Atlasization.Internal.Wizard
                 {
                     EditorGUILayout.LabelField($"Materials : {configuration.Materials.Count}");
                     EditorGUILayout.LabelField($"Textures  : {configuration.Textures.Count}");
+                }
+
+                EditorGUILayout.LabelField("SubMesh Mapping");
+                using (new EditorGUI.IndentLevelScope())
+                {
+                    foreach (var layout in configuration.MeshLayouts)
+                    {
+                        CustomField.ObjectPicker("Material Key", layout.Material);
+                        EditorGUILayout.IntField("Layer ID", layout.Channel);
+                    }
                 }
 
                 EditorGUILayout.LabelField("Texture Mapping");
@@ -88,8 +100,19 @@ namespace Mochizuki.Atlasization.Internal.Wizard
                 }
 
                 mesh.WriteNewUVs(0, texture);
-                mesh.CombineChannels(0, Enumerable.Range(0, mesh.Channels).ToList());
-                mesh.ReduceSubMeshTo(1);
+
+                var reduceTo = 0;
+                foreach (var group in configuration.MeshLayouts.GroupBy(w => w.Channel))
+                {
+                    var materialSlots = mesh.GetChannels(group.ToList());
+                    if (group.Key >= mesh.Channels)
+                        continue;
+
+                    mesh.CombineChannels(group.Key, materialSlots);
+                    reduceTo++;
+                }
+
+                mesh.ReduceSubMeshTo(reduceTo);
                 mesh.SaveAsAsset($"{configuration.DestPath}_{counter++}.asset");
                 mesh.Apply();
 

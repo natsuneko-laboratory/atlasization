@@ -24,6 +24,8 @@ namespace Mochizuki.Atlasization.Internal.Wizard
             _mode = Mode.Standard;
         }
 
+        public void OnAwake(AtlasConfiguration configuration) { }
+
         public bool OnGui(AtlasConfiguration configuration)
         {
             using (new EditorGUILayout.VerticalScope(GUI.skin.box))

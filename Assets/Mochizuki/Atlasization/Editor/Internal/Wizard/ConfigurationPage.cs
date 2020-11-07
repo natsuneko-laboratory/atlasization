@@ -39,6 +39,8 @@ namespace Mochizuki.Atlasization.Internal.Wizard
             _size = AtlasSize.Four;
         }
 
+        public void OnAwake(AtlasConfiguration configuration) { }
+
         public bool OnGui(AtlasConfiguration configuration)
         {
             using (new EditorGUILayout.VerticalScope(GUI.skin.box))
