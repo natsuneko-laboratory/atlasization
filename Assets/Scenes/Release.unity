@@ -293,7 +293,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _name: Atlasization
-  _version: 0.1.0-alpha.4
+  _version: 0.1.0-alpha.5
   _describe:
     _output: Mochizuki/Packages
     _variations:
