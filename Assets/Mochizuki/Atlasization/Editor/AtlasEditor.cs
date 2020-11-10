@@ -118,6 +118,10 @@ namespace Mochizuki.Atlasization
                     _scroll = Vector2.zero;
                 }
             }
+            catch (ExitGUIException)
+            {
+                throw;
+            }
             catch (Exception e)
             {
                 Debug.LogException(e);
