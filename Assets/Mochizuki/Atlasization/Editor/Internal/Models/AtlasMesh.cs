@@ -111,8 +111,12 @@ namespace Mochizuki.Atlasization.Internal.Models
                         continue;
 
                     var uv = uvs[triangle];
-                    uv.x = uv.x * texelSize + offsetX;
-                    uv.y = uv.y * texelSize + offsetY;
+
+                    uv.x = ClampUV(uv.x) * texelSize + offsetX;
+                    uv.y = ClampUV(uv.y) * texelSize + offsetY;
+
+                    uv.x = ClampUV(uv.x, offsetX, offsetX + texelSize);
+                    uv.y = ClampUV(uv.y, offsetY, offsetY + texelSize);
 
                     calculatedTriangle.Add(triangle);
 
@@ -142,6 +146,18 @@ namespace Mochizuki.Atlasization.Internal.Models
             if (material.HasProperty("_MainTex") && material.mainTexture != null)
                 return TextureUtils.CreateReadableTexture2D(material.mainTexture as Texture2D);
             return TextureUtils.CreateTextureFromColor(material.color);
+        }
+
+        private static float ClampUV(float f, float min = 0, float max = 1)
+        {
+            if (min <= f && f <= max)
+                return f;
+            if (f < min)
+                return max - -1 * (f % max);
+            if (f > max)
+                return f % max;
+
+            throw new InvalidOperationException();
         }
     }
 }
